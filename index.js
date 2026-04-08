@@ -2,48 +2,38 @@ const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const TelegramBot = require('node-telegram-bot-api');
 
-// التوكن الخاص بك والرقم المستهدف
-const TELEGRAM_TOKEN = '8262731260:AAHmY8o0OTdGm8Wz_86CdkgRVJYFB2Ivybw';
-const WHATSAPP_TARGET = '1203634242525565248@g.us';
+// --- الإعدادات الصحيحة للجروب ---
+const TELEGRAM_TOKEN = '8262731260:AAHmY8o00TdGm8Wz_86CdkgrVJYFB2Ivybw';
+const WHATSAPP_TARGET = '1203634242525565248@g.us'; // لاحظ الـ @g.us في الآخر
 
 const telegramBot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
-
 const whatsappClient = new Client({
     authStrategy: new LocalAuth(),
-    // السطر ده هو الحل لخطأ null (reading '1') اللي في صورتك
-    webVersionCache: {
-        type: 'remote',
-        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
-    },
-    puppeteer: { 
-        headless: true, 
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] 
+    puppeteer: {
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
     }
 });
 
-whatsappClient.on('qr', (qr) => {
-    console.log('✅ امسح الكود الآن:');
-    qrcode.generate(qr, { small: true });
-});
-
-whatsappClient.on('ready', () => {
-    console.log('🚀 البوت شغال وجاهز!');
-});
+whatsappClient.on('qr', qr => qrcode.generate(qr, { small: true }));
+whatsappClient.on('ready', () => console.log('✅ البوت جاهز للإرسال للجروب!'));
 
 telegramBot.on('message', async (msg) => {
     try {
-        if (msg.text && !msg.photo && !msg.video) {
+        // لو رسالة نصية
+        if (msg.text) {
             await whatsappClient.sendMessage(WHATSAPP_TARGET, msg.text);
-            console.log('📤 نص تم إرساله');
-        } else if (msg.photo || msg.video) {
-            const fileId = msg.photo ? msg.photo[msg.photo.length - 1].file_id : msg.video.file_id;
-            const fileLink = await telegramBot.getFileLink(fileId);
-            const media = await MessageMedia.fromUrl(fileLink);
-            await whatsappClient.sendMessage(WHATSAPP_TARGET, media, { caption: msg.caption || '' });
-            console.log('📸 ميديا تم إرسالها');
         }
-    } catch (err) {
-        console.log('❌ Error: ' + err.message);
+        
+        // لو صورة أو فيديو
+        const fileId = msg.photo ? msg.photo[msg.photo.length - 1].file_id : (msg.video ? msg.video.file_id : null);
+        if (fileId) {
+            const link = await telegramBot.getFileLink(fileId);
+            const media = await MessageMedia.fromUrl(link);
+            await whatsappClient.sendMessage(WHATSAPP_TARGET, media, { caption: msg.caption || '' });
+        }
+    } catch (e) {
+        console.log('❌ خطأ في الإرسال:', e.message);
     }
 });
 
