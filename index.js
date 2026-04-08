@@ -4,7 +4,7 @@ const TelegramBot = require('node-telegram-bot-api');
 
 // التوكن الخاص بك والرقم المستهدف
 const TELEGRAM_TOKEN = '8262731260:AAHmY8o0OTdGm8Wz_86CdkgRVJYFB2Ivybw';
-const WHATSAPP_TARGET = '201159349164@c.us';
+const WHATSAPP_TARGET = '1203634242525565248@g.us';
 
 const telegramBot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
