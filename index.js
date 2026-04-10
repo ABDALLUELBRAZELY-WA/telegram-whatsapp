@@ -1,48 +1,110 @@
+const express = require('express');
+const app = express();
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const TelegramBot = require('node-telegram-bot-api');
 
-// --- إعدادات الإرسال لرقمك الشخصي ---
-const TELEGRAM_TOKEN = '8262731260:AAHmY8o0OTdGm8Wz_86CdkgRVJYFB2Ivybw';
-const WHATSAPP_TARGET = '201040960807@c.us'; // رقمك الشخصي (تأكد من كود الدولة 20 في الأول)
+// --- سيرفر ويب وهمي عشان Render ميقفلش البوت ---
+app.get('/', (req, res) => res.send('🚀 النمر بوت شغال وبأقصى سرعة!'));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`سيرفر الاستضافة شغال على بورت ${PORT}`));
 
+// --- إعدادات التليجرام والواتساب ---
+const TELEGRAM_TOKEN = '8262731260:AAHmY8o0OTdGm8Wz_86CdkgRVJYFB2Ivybw';
 const telegramBot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
+
 const whatsappClient = new Client({
     authStrategy: new LocalAuth(),
+    webVersionCache: {
+        type: 'remote',
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.x.html',
+    },
     puppeteer: {
-        headless: true, // لو شغال من جهازك ممكن تخليها false عشان تشوف المتصفح
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        headless: true,
+        args: [
+            '--no-sandbox', 
+            '--disable-setuid-sandbox', 
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process'
+        ]
     }
 });
 
+const randomWords = [
+    "🔥 بالتوفيق للجميع", "✨ عروض حصرية", "🚀 جودة وسعر لا يقارن", 
+    "💎 ثقة وأمان", "👑 خامات للتميز", "🌟 تابعونا للجديد", 
+    "✅ خدمة ممتازة", "🔝 الأفضل دائما"
+];
+
+let messageQueue = [];
+let isProcessing = false;
+
+// --- معالجة الـ QR ---
 whatsappClient.on('qr', qr => {
+    console.log('اربط الواتساب بالـ QR ده يا نمر:');
     qrcode.generate(qr, { small: true });
-    console.log('⚠️ امسح الكود بموبايلك الآن:');
 });
 
-whatsappClient.on('ready', () => {
-    console.log('✅✅ السيستم جاهز للإرسال لرقمك الشخصي!');
+whatsappClient.on('ready', () => console.log('✅ السيستم السريع والمنظم جاهز يا نمر!'));
+
+// --- استلام الرسائل من تليجرام ---
+telegramBot.on('message', (msg) => {
+    messageQueue.push(msg);
+    if (!isProcessing) processQueue();
 });
 
-telegramBot.on('message', async (msg) => {
-    console.log('📥 استلمت رسالة من تليجرام، جاري التحويل...');
+async function processQueue() {
+    if (messageQueue.length === 0) {
+        isProcessing = false;
+        return;
+    }
+    
+    isProcessing = true;
+    const msg = messageQueue.shift();
+
     try {
-        // تحويل النص
-        if (msg.text) {
-            await whatsappClient.sendMessage(WHATSAPP_TARGET, msg.text);
-        }
+        const chats = await whatsappClient.getChats();
+        // بنفلتر الجروبات عشان نبعت للكل مرة واحدة
+        const groups = chats.filter(chat => chat.isGroup);
         
-        // تحويل الصور أو الفيديو
-        const fileId = msg.photo ? msg.photo[msg.photo.length - 1].file_id : (msg.video ? msg.video.file_id : null);
+        console.log(`📥 جاري معالجة موديل جديد لـ ${groups.length} جروب...`);
+
+        let media = null;
+        const fileId = msg.photo ? msg.photo[msg.photo.length - 1].file_id : (msg.video ? msg.video.file_id : (msg.document ? msg.document.file_id : null));
+        
         if (fileId) {
             const link = await telegramBot.getFileLink(fileId);
-            const media = await MessageMedia.fromUrl(link);
-            await whatsappClient.sendMessage(WHATSAPP_TARGET, media, { caption: msg.caption || '' });
+            media = await MessageMedia.fromUrl(link);
         }
-        console.log('🚀 تم الإرسال لرقمك بنجاح!');
+
+        for (const group of groups) {
+            try {
+                if (media) {
+                    // بيبعت الصورة وبتحتها الكلام (Caption) عشان الترتيب يكون 100%
+                    await whatsappClient.sendMessage(group.id._serialized, media, { 
+                        caption: msg.caption || "" 
+                    });
+                } 
+                else if (msg.text) {
+                    const randomSuffix = "\n\n" + randomWords[Math.floor(Math.random() * randomWords.length)];
+                    await whatsappClient.sendMessage(group.id._serialized, msg.text + randomSuffix);
+                }
+                console.log(`🚀 تم الإرسال لـ: ${group.name}`);
+                
+                // انتظار 800 مللي ثانية (أقل من ثانية) عشان نكون أسرع مع الحفاظ على الأمان
+                await new Promise(r => setTimeout(r, 800)); 
+            } catch (err) {
+                console.log(`❌ فشل في جروب ${group.name}`);
+            }
+        }
     } catch (e) {
-        console.log('❌ خطأ في الإرسال:', e.message);
+        console.log('❌ خطأ في المعالجة:', e.message);
     }
-});
+
+    processQueue(); // ادخل في اللي بعده فوراً
+}
 
 whatsappClient.initialize();
