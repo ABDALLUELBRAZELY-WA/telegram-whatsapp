@@ -1,106 +1,55 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const { Boom } = require('@hapi/boom');
+// السطر ده هو اللي هيحل مشكلة الـ crypto يا نمر
+const crypto = require('crypto'); 
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
+const qrcode = require('qrcode-terminal');
 const TelegramBot = require('node-telegram-bot-api');
-const fetch = require('node-fetch');
-const fs = require('fs');
 
+// توكن التيليجرام بتاعك
 const TELEGRAM_TOKEN = '8262731260:AAHmY8o0OTdGm8Wz_86CdkgRVJYFB2Ivybw';
-
 const telegramBot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
-const randomWords = [
-    "🔥 بالتوفيق للجميع", "✨ عروض حصرية", "🚀 جودة وسعر لا يقارن",
-    "💎 ثقة وأمان", "👑 خامات للتميز", "🌟 تابعونا للجديد",
-    "✅ خدمة ممتازة", "🔝 الأفضل دائما"
-];
-
-let messageQueue = [];
-let isProcessing = false;
-let sock = null;
-
-async function connectToWhatsApp() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info');
-
-    sock = makeWASocket({
-        auth: state,
-        printQRInTerminal: true,
-    });
-
-    sock.ev.on('creds.update', saveCreds);
-
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update;
-        if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect.error instanceof Boom)
-                ? lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut
-                : true;
-            console.log('❌ الاتصال انقطع، جاري إعادة الاتصال:', shouldReconnect);
-            if (shouldReconnect) connectToWhatsApp();
-        } else if (connection === 'open') {
-            console.log('✅ الواتساب جاهز! البوت شغال 🚀');
-        }
-    });
-}
-
-telegramBot.on('message', (msg) => {
-    messageQueue.push(msg);
-    processQueue();
+const whatsappClient = new Client({
+    authStrategy: new LocalAuth(),
+    puppeteer: {
+        headless: true,
+        args: [
+            '--no-sandbox', 
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage'
+        ]
+    }
 });
 
-async function processQueue() {
-    if (isProcessing || messageQueue.length === 0 || !sock) return;
+const randomWords = ["🔥 بالتوفيق للجميع", "✨ عروض حصرية", "🚀 جودة وسعر لا يقارن", "💎 ثقة وأمان"];
 
-    isProcessing = true;
-    const msg = messageQueue.shift();
+whatsappClient.on('qr', qr => {
+    console.log('--- سجل دخول من الكود ده يا نمر ---');
+    qrcode.generate(qr, { small: true });
+});
 
+whatsappClient.on('ready', () => console.log('✅ البوت شغال يا نمر!'));
+
+telegramBot.on('message', async (msg) => {
     try {
-        // جيب كل الجروبات
-        const groups = Object.keys(await sock.groupFetchAllParticipating());
-
-        const fileId = msg.photo ? msg.photo[msg.photo.length - 1].file_id
-            : msg.video ? msg.video.file_id
-            : msg.document ? msg.document.file_id
-            : null;
-
-        let mediaBuffer = null;
-        let mimetype = null;
-
+        const chats = await whatsappClient.getChats();
+        const groups = chats.filter(chat => chat.isGroup);
+        
+        let media = null;
+        let fileId = msg.photo ? msg.photo[msg.photo.length - 1].file_id : (msg.video ? msg.video.file_id : null);
+        
         if (fileId) {
             const link = await telegramBot.getFileLink(fileId);
-            const res = await fetch(link);
-            mediaBuffer = await res.buffer();
-            mimetype = msg.photo ? 'image/jpeg' : msg.video ? 'video/mp4' : 'application/octet-stream';
+            media = await MessageMedia.fromUrl(link);
         }
 
-        for (const groupId of groups) {
-            try {
-                if (mediaBuffer) {
-                    await sock.sendMessage(groupId, {
-                        [msg.photo ? 'image' : 'video']: mediaBuffer,
-                        mimetype,
-                        caption: ''
-                    });
-                    console.log(`🖼️ ميديا وصلت`);
-                }
-
-                if (msg.text || msg.caption) {
-                    const baseText = msg.text || msg.caption || "";
-                    const randomSuffix = "\n\n" + randomWords[Math.floor(Math.random() * randomWords.length)];
-                    await sock.sendMessage(groupId, { text: baseText + randomSuffix });
-                    console.log(`📝 النص وصل`);
-                }
-
-                await new Promise(r => setTimeout(r, 800));
-            } catch (err) {
-                console.log(`❌ فشل في جروب: ${err.message}`);
+        for (const group of groups) {
+            if (media) await whatsappClient.sendMessage(group.id._serialized, media);
+            if (msg.text || msg.caption) {
+                const suffix = "\n\n" + randomWords[Math.floor(Math.random() * randomWords.length)];
+                await whatsappClient.sendMessage(group.id._serialized, (msg.text || msg.caption) + suffix);
             }
         }
-    } catch (e) {
-        console.log('❌ خطأ في المعالجة:', e.message);
-    }
+    } catch (e) { console.log('Error:', e.message); }
+});
 
-    isProcessing = false;
-    processQueue();
-}
-
-connectToWhatsApp();
+whatsappClient.initialize();
