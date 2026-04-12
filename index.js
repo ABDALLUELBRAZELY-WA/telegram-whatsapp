@@ -1,15 +1,18 @@
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const TelegramBot = require('node-telegram-bot-api');
-const express = require('express'); // أضفنا هذا لتجنب إيقاف السيرفر
+const express = require('express');
 
 // --- إعداد سيرفر وهمي لإبقاء Fly.io سعيداً ---
 const app = express();
 const port = process.env.PORT || 8080;
 app.get('/', (req, res) => res.send('Bot is Running!'));
-app.listen(port, '0.0.0.0', () => console.log(`Health check listening on port ${port}`));
+app.listen(port, '0.0.0.0', () => {
+    console.log(`✅ Health check listening on port ${port}`);
+});
 
 // --- إعدادات التليجرام ---
+// تأكد أن هذا التوكن هو الأحدث لديك
 const TELEGRAM_TOKEN = '8262731260:AAHmY8o0OTdGm8Wz_86CdkgRVJYFB2Ivybw';
 const telegramBot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
@@ -25,7 +28,6 @@ const whatsappClient = new Client({
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--single-process', 
             '--disable-gpu'
         ],
         executablePath: '/usr/bin/chromium' 
@@ -43,15 +45,19 @@ let isProcessing = false;
 
 // عرض QR Code في الـ Logs
 whatsappClient.on('qr', qr => {
-    console.log('--- سجل دخول يا نمر من الكيو آر كود ده ---');
+    console.log('\n--- سجل دخول يا نمر من الكيو آر كود ده ---');
+    console.log('ملاحظة: إذا ظهر الكود مبعثراً، صغر زوم المتصفح (Ctrl مع -)\n');
     qrcode.generate(qr, { small: true });
 });
 
 whatsappClient.on('ready', () => {
-    console.log('✅ السيرفر جاهز! البوت شغال دلوقتي بنجاح 🚀');
+    console.log('\n✅✅✅ السيرفر جاهز! البوت شغال دلوقتي بنجاح 🚀\n');
 });
 
 telegramBot.on('message', (msg) => {
+    // تجاهل الأوامر مثل /start
+    if (msg.text && msg.text.startsWith('/')) return;
+    
     messageQueue.push(msg);
     processQueue();
 });
@@ -82,6 +88,8 @@ async function processQueue() {
             }
         }
 
+        console.log(`⏳ جاري الإرسال إلى ${groups.length} مجموعة...`);
+
         for (const group of groups) {
             try {
                 if (media) {
@@ -90,24 +98,26 @@ async function processQueue() {
                     const randomSuffix = "\n\n" + randomWords[Math.floor(Math.random() * randomWords.length)];
                     await whatsappClient.sendMessage(group.id._serialized, msg.text + randomSuffix);
                 }
-                // انتظار بسيط لتجنب الحظر (3 ثوانٍ أفضل للأمان)
+                // انتظار 3 ثوانٍ بين كل مجموعة لتجنب الحظر
                 await new Promise(r => setTimeout(r, 3000)); 
             } catch (err) {
                 console.log(`❌ تخطي جروب: ${group.name}`);
             }
         }
+        console.log('✅ تم الانتهاء من إرسال الرسالة الحالية.');
     } catch (e) {
         console.log('⚠️ تنبيه: حدث خطأ أثناء معالجة القائمة');
     }
 
     isProcessing = false;
-    processQueue(); 
+    // التحقق من وجود رسائل أخرى في القائمة
+    if (messageQueue.length > 0) processQueue();
 }
 
-// التعامل مع أخطاء التليجرام (polling errors) لمنع الانهيار
+// التعامل مع أخطاء التليجرام لمنع الانهيار
 telegramBot.on('polling_error', (error) => {
     if (error.code === 'ETELEGRAM' && error.message.includes('conflict')) {
-        console.log('⚠️ تنبيه: البوت يعمل في مكان آخر، يرجى إغلاق النسخة القديمة.');
+        console.log('⚠️ تنبيه: البوت يعمل في مكان آخر (Conflict). تأكد من إغلاق أي نسخة مفتوحة في Codespaces.');
     }
 });
 
