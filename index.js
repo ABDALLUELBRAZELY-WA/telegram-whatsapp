@@ -8,23 +8,23 @@ const port = process.env.PORT || 8080;
 
 let latestQr = "";
 
-// إعداد خادم الويب لعرض الكيو آر كصورة واضحة
+// 1. خادم الويب لعرض الكيو آر كصورة واضحة في المتصفح
 app.get('/', (req, res) => {
     if (latestQr) {
         res.send(`
             <html>
-                <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background-color:#f4f4f9;">
-                    <div style="background:white;padding:40px;border-radius:20px;box-shadow:0 10px 25px rgba(0,0,0,0.1);text-align:center;">
-                        <h2 style="color:#128c7e;">سجل دخول يا نمر - النمر للأبواب 🦁</h2>
+                <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background-color:#f4f4f9;margin:0;">
+                    <div style="background:white;padding:40px;border-radius:20px;box-shadow:0 10px 25px rgba(0,0,0,0.1);text-align:center; max-width: 400px;">
+                        <h2 style="color:#128c7e;">لوحة التحكم - تسجيل دخول 🛍️</h2>
                         <img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(latestQr)}&size=300x300" style="border:10px solid #fff;border-radius:10px;" />
-                        <p style="color:#666;margin-top:20px;">افتح الواتساب من موبايلك وصور الكود ده</p>
+                        <p style="color:#666;margin-top:20px;line-height:1.6;">افتح الواتساب من موبايلك واعمل مسح (Scan) للكود عشان تبدأ الإرسال التلقائي.</p>
                     </div>
                     <script>setTimeout(() => location.reload(), 30000);</script>
                 </body>
             </html>
         `);
     } else {
-        res.send('<h1 style="text-align:center;margin-top:50px;font-family:sans-serif;">✅ البوت شغال.. جاري تجهيز الكود أو تم الاتصال</h1>');
+        res.send('<h1 style="text-align:center;margin-top:50px;font-family:sans-serif;color:#128c7e;">✅ البوت يعمل بنجاح ومستعد للإرسال</h1>');
     }
 });
 
@@ -32,22 +32,33 @@ app.listen(port, '0.0.0.0', () => {
     console.log(`✅ السيرفر يعمل على المنفذ ${port}`);
 });
 
+// 2. دالة الـ SpinTax الاحترافية
+function applySpinTax(text) {
+    return text.replace(/{([^{}]+)}/g, function(match, options) {
+        const choices = options.split('|');
+        return choices[Math.floor(Math.random() * choices.length)];
+    });
+}
+
 // إعدادات التليجرام
 const TELEGRAM_TOKEN = '8262731260:AAHmY8o0OTdGm8Wz_86CdkgRVJYFB2Ivybw';
 const telegramBot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
-// إعدادات واتساب
+// إعدادات واتساب مع معالجة المتصفح للسيرفر
 const whatsappClient = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--no-first-run', '--no-zygote', '--disable-gpu'],
+        args: [
+            '--no-sandbox', 
+            '--disable-setuid-sandbox', 
+            '--disable-dev-shm-usage', 
+            '--disable-gpu',
+            '--no-zygote'
+        ],
         executablePath: '/usr/bin/chromium' 
     }
 });
-
-// الكلمات المتغيرة (التي أرسلتها أنت في الكود)
-const randomWords = ["🔥 بالتوفيق للجميع", "✨ عروض حصرية", "🚀 جودة وسعر لا يقارن", "💎 ثقة وأمان", "👑 خامات للتميز"];
 
 let messageQueue = [];
 let isProcessing = false;
@@ -55,12 +66,12 @@ let isProcessing = false;
 whatsappClient.on('qr', qr => {
     latestQr = qr;
     qrcode.generate(qr, { small: true });
-    console.log('⚠️ كود QR جديد متاح.. افتح رابط السيرفر للمسح.');
+    console.log('⚠️ كود QR جديد متاح.. افتح الرابط للمسح.');
 });
 
 whatsappClient.on('ready', () => {
     latestQr = "";
-    console.log('✅ تم الربط بنجاح! البوت جاهز للإرسال.');
+    console.log('✅ تم الربط بنجاح! البوت جاهز لإرسال المنتجات.');
 });
 
 telegramBot.on('message', (msg) => {
@@ -90,33 +101,34 @@ async function processQueue() {
             media = await MessageMedia.fromUrl(link);
         }
 
+        // --- جمل متغيرة خاصة بالملابس والأحذية والشنط ---
+        const introSpin = "{🔥 تشكيلة جديدة وصلت الآن|✨ شياكتك عندنا بأعلى كواليتي|🚀 أقوى كوليكشن ملابس وأحذية|💎 خامات أوريجينال وتقفيل ممتاز|🌟 التميز في كل قطعة بنقدملكم}";
+
         for (const group of groups) {
             try {
-                // اختيار كلمة عشوائية من القائمة التي حددتها أنت
-                const randomSuffix = "\n\n" + randomWords[Math.floor(Math.random() * randomWords.length)];
+                const randomIntro = applySpinTax(introSpin);
+                const groupTag = `\n\n📌 *عملاء جروب: ${group.name}*`;
                 
-                // دمج اسم الجروب (لزيادة التخصيص ومنع الحظر)
-                const groupInfo = `\n📌 الجروب: *${group.name}*`;
-
                 if (media) {
-                    const captionText = (msg.caption || "") + randomSuffix + groupInfo;
+                    const captionText = `${randomIntro}\n\n${msg.caption || ""}${groupTag}`;
                     await whatsappClient.sendMessage(group.id._serialized, media, { caption: captionText });
                 } else if (msg.text) {
-                    const messageText = msg.text + randomSuffix + groupInfo;
+                    const messageText = `${randomIntro}\n\n${msg.text}${groupTag}`;
                     await whatsappClient.sendMessage(group.id._serialized, messageText);
                 }
 
-                console.log(`✅ تم الإرسال لـ: ${group.name}`);
+                console.log(`✅ تم إرسال المنتج لجروب: ${group.name}`);
                 
-                // تأخير بسيط بين الإرسال لكل جروب (حماية إضافية)
-                await new Promise(r => setTimeout(r, 4000));
+                // تأخير عشوائي للحماية من الحظر (بين 4 لـ 8 ثواني)
+                const delay = Math.floor(Math.random() * (8000 - 4000 + 1) + 4000);
+                await new Promise(r => setTimeout(r, delay));
 
             } catch (err) {
-                console.log(`❌ فشل في جروب: ${group.name}`);
+                console.log(`❌ فشل الإرسال لجروب: ${group.name}`);
             }
         }
     } catch (e) {
-        console.log('⚠️ خطأ عام في المعالجة');
+        console.log('⚠️ خطأ في معالجة الرسالة');
     }
 
     isProcessing = false;
