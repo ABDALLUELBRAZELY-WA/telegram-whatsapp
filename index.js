@@ -1,10 +1,10 @@
-// حل مشكلة التشفير والوحدات المفقودة في منصات الاستضافة
+// السطر ده هو "الزتونة" اللي هتحل مشكلة الـ crypto في Bonto
 const crypto = require('crypto'); 
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const TelegramBot = require('node-telegram-bot-api');
 
-// توكن التيليجرام بتاعك (زي ما هو)
+// توكن التيليجرام بتاعك
 const TELEGRAM_TOKEN = '8262731260:AAHmY8o0OTdGm8Wz_86CdkgRVJYFB2Ivybw';
 const telegramBot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
@@ -15,7 +15,8 @@ const whatsappClient = new Client({
         args: [
             '--no-sandbox', 
             '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage'
+            '--disable-dev-shm-usage',
+            '--disable-gpu'
         ]
     }
 });
@@ -27,7 +28,9 @@ whatsappClient.on('qr', qr => {
     qrcode.generate(qr, { small: true });
 });
 
-whatsappClient.on('ready', () => console.log('✅ البوت شغال يا نمر على السيرفر الجديد!'));
+whatsappClient.on('ready', () => {
+    console.log('✅ السيرفر جاهز! البوت شغال دلوقتي طلقة 🚀');
+});
 
 telegramBot.on('message', async (msg) => {
     try {
@@ -49,12 +52,14 @@ telegramBot.on('message', async (msg) => {
                     const suffix = "\n\n" + randomWords[Math.floor(Math.random() * randomWords.length)];
                     await whatsappClient.sendMessage(group.id._serialized, (msg.text || msg.caption) + suffix);
                 }
-                await new Promise(r => setTimeout(r, 1000)); // انتظار ثانية بين كل جروب للأمان
+                await new Promise(r => setTimeout(r, 1000)); // انتظار ثانية بين كل جروب عشان الأمان
             } catch (err) {
-                console.log(`❌ فشل في جروب ${group.name}`);
+                console.log(`❌ فشل في جروب: ${group.name}`);
             }
         }
-    } catch (e) { console.log('Error:', e.message); }
+    } catch (e) {
+        console.log('⚠️ خطأ في المعالجة:', e.message);
+    }
 });
 
 whatsappClient.initialize();
