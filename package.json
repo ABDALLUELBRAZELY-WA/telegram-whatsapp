@@ -1,6 +1,0 @@
-"dependencies": {
-  "express": "^4.18.2",
-  "whatsapp-web.js": "latest",
-  "node-telegram-bot-api": "latest",
-  "qrcode-terminal": "latest"
-}
