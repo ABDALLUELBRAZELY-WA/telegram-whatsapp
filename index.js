@@ -1,4 +1,4 @@
-// حل مشكلة التشفير والوحدات المفقودة في Bonto
+// حل مشكلة التشفير والوحدات المفقودة في منصات الاستضافة
 const crypto = require('crypto'); 
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
@@ -12,7 +12,11 @@ const whatsappClient = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        args: [
+            '--no-sandbox', 
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage'
+        ]
     }
 });
 
@@ -31,7 +35,7 @@ telegramBot.on('message', async (msg) => {
         const groups = chats.filter(chat => chat.isGroup);
         
         let media = null;
-        let fileId = msg.photo ? msg.photo[msg.photo.length - 1].file_id : (msg.video ? msg.video.file_id : null);
+        let fileId = msg.photo ? msg.photo[msg.photo.length - 1].file_id : (msg.video ? msg.video.file_id : (msg.document ? msg.document.file_id : null));
         
         if (fileId) {
             const link = await telegramBot.getFileLink(fileId);
@@ -39,10 +43,15 @@ telegramBot.on('message', async (msg) => {
         }
 
         for (const group of groups) {
-            if (media) await whatsappClient.sendMessage(group.id._serialized, media);
-            if (msg.text || msg.caption) {
-                const suffix = "\n\n" + randomWords[Math.floor(Math.random() * randomWords.length)];
-                await whatsappClient.sendMessage(group.id._serialized, (msg.text || msg.caption) + suffix);
+            try {
+                if (media) await whatsappClient.sendMessage(group.id._serialized, media);
+                if (msg.text || msg.caption) {
+                    const suffix = "\n\n" + randomWords[Math.floor(Math.random() * randomWords.length)];
+                    await whatsappClient.sendMessage(group.id._serialized, (msg.text || msg.caption) + suffix);
+                }
+                await new Promise(r => setTimeout(r, 1000)); // انتظار ثانية بين كل جروب للأمان
+            } catch (err) {
+                console.log(`❌ فشل في جروب ${group.name}`);
             }
         }
     } catch (e) { console.log('Error:', e.message); }
