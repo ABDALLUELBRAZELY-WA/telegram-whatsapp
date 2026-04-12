@@ -1,8 +1,8 @@
-FROM node:18
+FROM node:18-bookworm
 
-# تثبيت المتصفح والاعتمادات اللازمة بصلاحيات كاملة داخل السيرفر
+# تثبيت المتصفح والاعتمادات اللازمة لعمل Puppeteer
 RUN apt-get update && apt-get install -y \
-    chromium-browser \
+    chromium \
     fonts-liberation \
     libappindicator3-1 \
     libasound2 \
@@ -13,9 +13,9 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# تحديد مسار المتصفح ليعرف الكود مكانه
+# تحديد مسار المتصفح الصحيح لنظام Debian
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 WORKDIR /app
 COPY package*.json ./
