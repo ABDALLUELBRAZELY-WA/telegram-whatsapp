@@ -1,10 +1,10 @@
-// السطر ده هو اللي هيحل مشكلة الـ crypto يا نمر
+// حل مشكلة التشفير والوحدات المفقودة في Bonto
 const crypto = require('crypto'); 
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const TelegramBot = require('node-telegram-bot-api');
 
-// توكن التيليجرام بتاعك
+// توكن التيليجرام بتاعك (زي ما هو)
 const TELEGRAM_TOKEN = '8262731260:AAHmY8o0OTdGm8Wz_86CdkgRVJYFB2Ivybw';
 const telegramBot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
@@ -12,11 +12,7 @@ const whatsappClient = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
         headless: true,
-        args: [
-            '--no-sandbox', 
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage'
-        ]
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
     }
 });
 
@@ -27,7 +23,7 @@ whatsappClient.on('qr', qr => {
     qrcode.generate(qr, { small: true });
 });
 
-whatsappClient.on('ready', () => console.log('✅ البوت شغال يا نمر!'));
+whatsappClient.on('ready', () => console.log('✅ البوت شغال يا نمر على السيرفر الجديد!'));
 
 telegramBot.on('message', async (msg) => {
     try {
