@@ -6,25 +6,25 @@ const express = require('express');
 const app = express();
 const port = process.env.PORT || 8080;
 
-// متغير لتخزين رابط الـ QR لفتحه كصورة
 let latestQr = "";
 
-// --- إعداد سيرفر الويب لحل مشكلة الـ Health Check وعرض الـ QR ---
+// إعداد خادم الويب لعرض الكيو آر كصورة واضحة
 app.get('/', (req, res) => {
     if (latestQr) {
-        // إذا كان هناك كود QR، سيعرضه كصورة واضحة في المتصفح
         res.send(`
             <html>
-                <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;">
-                    <h2>سجل دخول يا نمر - النمر للأبواب</h2>
-                    <img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(latestQr)}&size=300x300" />
-                    <p>صور الكود ده من الواتساب في موبايلك</p>
+                <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background-color:#f4f4f9;">
+                    <div style="background:white;padding:40px;border-radius:20px;box-shadow:0 10px 25px rgba(0,0,0,0.1);text-align:center;">
+                        <h2 style="color:#128c7e;">سجل دخول يا نمر - النمر للأبواب 🦁</h2>
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(latestQr)}&size=300x300" style="border:10px solid #fff;border-radius:10px;" />
+                        <p style="color:#666;margin-top:20px;">افتح الواتساب من موبايلك وصور الكود ده</p>
+                    </div>
                     <script>setTimeout(() => location.reload(), 30000);</script>
                 </body>
             </html>
         `);
     } else {
-        res.send('<h1>البوت شغال.. جاري تجهيز الكود أو تم الربط بنجاح ✅</h1>');
+        res.send('<h1 style="text-align:center;margin-top:50px;font-family:sans-serif;">✅ البوت شغال.. جاري تجهيز الكود أو تم الاتصال</h1>');
     }
 });
 
@@ -32,49 +32,37 @@ app.listen(port, '0.0.0.0', () => {
     console.log(`✅ السيرفر يعمل على المنفذ ${port}`);
 });
 
-// --- إعدادات التليجرام ---
+// إعدادات التليجرام
 const TELEGRAM_TOKEN = '8262731260:AAHmY8o0OTdGm8Wz_86CdkgRVJYFB2Ivybw';
 const telegramBot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
-// --- إعدادات واتساب ---
+// إعدادات واتساب
 const whatsappClient = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
         headless: true,
-        args: [
-            '--no-sandbox', 
-            '--disable-setuid-sandbox', 
-            '--disable-dev-shm-usage',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu'
-        ],
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--no-first-run', '--no-zygote', '--disable-gpu'],
         executablePath: '/usr/bin/chromium' 
     }
 });
 
+// الكلمات المتغيرة (التي أرسلتها أنت في الكود)
 const randomWords = ["🔥 بالتوفيق للجميع", "✨ عروض حصرية", "🚀 جودة وسعر لا يقارن", "💎 ثقة وأمان", "👑 خامات للتميز"];
+
 let messageQueue = [];
 let isProcessing = false;
 
-// --- معالجة الـ QR Code ---
 whatsappClient.on('qr', qr => {
-    latestQr = qr; // تخزين الكود لعرضه في الرابط
-    console.log('\n--------------------------------------------');
-    console.log('⚠️ الكود مبعثر؟ افتح الرابط ده في متصفحك وصور منه:');
-    console.log(`https://telegram-whatsapp-v9oz5w.fly.dev/`); 
-    console.log('--------------------------------------------\n');
-    
-    // محاولة طباعته مصغراً أيضاً في السجلات
+    latestQr = qr;
     qrcode.generate(qr, { small: true });
+    console.log('⚠️ كود QR جديد متاح.. افتح رابط السيرفر للمسح.');
 });
 
 whatsappClient.on('ready', () => {
-    latestQr = ""; // مسح الكود بعد الربط
-    console.log('\n✅✅✅ تم الربط بنجاح! البوت جاهز للعمل 🚀\n');
+    latestQr = "";
+    console.log('✅ تم الربط بنجاح! البوت جاهز للإرسال.');
 });
 
-// باقي منطق معالجة الرسائل كما هو في كودك الأصلي
 telegramBot.on('message', (msg) => {
     if (msg.text && msg.text.startsWith('/')) return;
     messageQueue.push(msg);
@@ -85,9 +73,11 @@ async function processQueue() {
     if (isProcessing || messageQueue.length === 0) return;
     isProcessing = true;
     const msg = messageQueue.shift();
+
     try {
         const chats = await whatsappClient.getChats();
         const groups = chats.filter(chat => chat.isGroup);
+
         let media = null;
         let fileId = null;
 
@@ -102,16 +92,33 @@ async function processQueue() {
 
         for (const group of groups) {
             try {
+                // اختيار كلمة عشوائية من القائمة التي حددتها أنت
+                const randomSuffix = "\n\n" + randomWords[Math.floor(Math.random() * randomWords.length)];
+                
+                // دمج اسم الجروب (لزيادة التخصيص ومنع الحظر)
+                const groupInfo = `\n📌 الجروب: *${group.name}*`;
+
                 if (media) {
-                    await whatsappClient.sendMessage(group.id._serialized, media, { caption: msg.caption || "" });
+                    const captionText = (msg.caption || "") + randomSuffix + groupInfo;
+                    await whatsappClient.sendMessage(group.id._serialized, media, { caption: captionText });
                 } else if (msg.text) {
-                    const randomSuffix = "\n\n" + randomWords[Math.floor(Math.random() * randomWords.length)];
-                    await whatsappClient.sendMessage(group.id._serialized, msg.text + randomSuffix);
+                    const messageText = msg.text + randomSuffix + groupInfo;
+                    await whatsappClient.sendMessage(group.id._serialized, messageText);
                 }
-                await new Promise(r => setTimeout(r, 3000)); 
-            } catch (err) { console.log(`❌ خطأ في جروب: ${group.name}`); }
+
+                console.log(`✅ تم الإرسال لـ: ${group.name}`);
+                
+                // تأخير بسيط بين الإرسال لكل جروب (حماية إضافية)
+                await new Promise(r => setTimeout(r, 4000));
+
+            } catch (err) {
+                console.log(`❌ فشل في جروب: ${group.name}`);
+            }
         }
-    } catch (e) { console.log('⚠️ خطأ في القائمة'); }
+    } catch (e) {
+        console.log('⚠️ خطأ عام في المعالجة');
+    }
+
     isProcessing = false;
     if (messageQueue.length > 0) processQueue();
 }
