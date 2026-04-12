@@ -1,6 +1,6 @@
-FROM node:18-bookworm
+FROM node:18-bullseye
 
-# تثبيت المتصفح والاعتمادات اللازمة لعمل Puppeteer
+# تثبيت متصفح Chromium والاعتمادات اللازمة
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-liberation \
@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# تحديد مسار المتصفح الصحيح لنظام Debian
+# إعداد المتغيرات البيئية لـ Puppeteer
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
