@@ -11,9 +11,9 @@ const telegramBot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 const whatsappClient = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        headless: true,
+        headless: true, // مهم جداً يكون true
         args: [
-            '--no-sandbox', 
+            '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-gpu'
